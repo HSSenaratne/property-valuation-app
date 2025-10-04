@@ -1,3 +1,17 @@
+import sys
+try:
+    import lightgbm as lgb
+    LGBM_AVAILABLE = True
+except ImportError:
+    LGBM_AVAILABLE = False
+    print("LightGBM not available - using Random Forest only")
+
+try:
+    import xgboost as xgb
+    XGBOOST_AVAILABLE = True
+except ImportError:
+    XGBOOST_AVAILABLE = False
+    print("XGBoost not available - using Random Forest only")
 import streamlit as st
 import pandas as pd
 import numpy as np

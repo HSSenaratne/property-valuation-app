@@ -49,5 +49,5 @@ This application leverages machine learning algorithms to accurately predict pro
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/your-username/property-valuation-app.git
+   git clone https://github.com/HSSenaratne/property-valuation-app
    cd property-valuation-app
