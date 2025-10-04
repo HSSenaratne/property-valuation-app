@@ -1,27 +1,20 @@
-import sys
-try:
-    import lightgbm as lgb
-    LGBM_AVAILABLE = True
-except ImportError:
-    LGBM_AVAILABLE = False
-    print("LightGBM not available - using Random Forest only")
-
-try:
-    import xgboost as xgb
-    XGBOOST_AVAILABLE = True
-except ImportError:
-    XGBOOST_AVAILABLE = False
-    print("XGBoost not available - using Random Forest only")
 import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-from property_model import PropertyValuationModel, create_sample_dataset
 import plotly.express as px
 import plotly.graph_objects as go
 import warnings
 warnings.filterwarnings('ignore')
+
+# Try to import your model with error handling
+try:
+    from property_model import PropertyValuationModel, create_sample_dataset
+    MODEL_AVAILABLE = True
+except ImportError as e:
+    MODEL_AVAILABLE = False
+    st.error(f"Model module import failed: {e}")
 
 # Page configuration
 st.set_page_config(
@@ -66,31 +59,30 @@ st.markdown("""
 
 class PropertyValuationApp:
     def __init__(self):
-        self.model = PropertyValuationModel()
+        if MODEL_AVAILABLE:
+            self.model = PropertyValuationModel()
+        else:
+            self.model = None
         self.df = None
-        self.results = None
         
-        # Initialize session state
-        if 'df_loaded' not in st.session_state:
-            st.session_state.df_loaded = False
-        if 'models_trained' not in st.session_state:
-            st.session_state.models_trained = False
-        if 'current_df' not in st.session_state:
-            st.session_state.current_df = None
-    
     def run(self):
         # Header
         st.markdown('<h1 class="main-header">🏠 Property Valuation Data Mining App</h1>', 
                    unsafe_allow_html=True)
+        
+        # Initialize session state
+        if 'data_loaded' not in st.session_state:
+            st.session_state.data_loaded = False
+        if 'current_data' not in st.session_state:
+            st.session_state.current_data = None
+        if 'models_trained' not in st.session_state:
+            st.session_state.models_trained = False
         
         # Sidebar
         st.sidebar.title("Navigation")
         app_mode = st.sidebar.selectbox("Choose Section", 
                                        ["Home", "Data Overview", "EDA", "Model Training", 
                                         "Predictions", "Results"])
-        
-        # Load data first if available
-        self.load_data()
         
         if app_mode == "Home":
             self.show_home()
@@ -104,11 +96,6 @@ class PropertyValuationApp:
             self.show_predictions()
         elif app_mode == "Results":
             self.show_results()
-    
-    def load_data(self):
-        """Load data into session state"""
-        if st.session_state.df_loaded and st.session_state.current_df is not None:
-            self.df = st.session_state.current_df
     
     def show_home(self):
         st.markdown("""
@@ -135,8 +122,8 @@ class PropertyValuationApp:
             if uploaded_file is not None:
                 try:
                     self.df = pd.read_csv(uploaded_file)
-                    st.session_state.current_df = self.df
-                    st.session_state.df_loaded = True
+                    st.session_state.current_data = self.df
+                    st.session_state.data_loaded = True
                     
                     st.markdown(f'<div class="success-box">✅ Dataset loaded successfully!<br>Shape: {self.df.shape}</div>', 
                                unsafe_allow_html=True)
@@ -152,26 +139,31 @@ class PropertyValuationApp:
             st.write("Don't have a dataset? Use our sample property data to test the application.")
             
             if st.button("Generate Sample Data", key="sample_data"):
-                with st.spinner("Creating sample dataset..."):
-                    self.df = create_sample_dataset()
-                    st.session_state.current_df = self.df
-                    st.session_state.df_loaded = True
-                    
-                    st.markdown(f'<div class="success-box">✅ Sample dataset created!<br>Shape: {self.df.shape}</div>', 
-                               unsafe_allow_html=True)
-                    
-                    st.subheader("Sample Data Preview")
-                    st.dataframe(self.df.head(10))
+                try:
+                    if MODEL_AVAILABLE:
+                        self.df = create_sample_dataset()
+                        st.session_state.current_data = self.df
+                        st.session_state.data_loaded = True
+                        
+                        st.markdown(f'<div class="success-box">✅ Sample dataset created!<br>Shape: {self.df.shape}</div>', 
+                                   unsafe_allow_html=True)
+                        
+                        st.subheader("Sample Data Preview")
+                        st.dataframe(self.df.head(10))
+                    else:
+                        st.error("Model module not available. Cannot generate sample data.")
+                except Exception as e:
+                    st.error(f"Error creating sample data: {e}")
     
     def show_data_overview(self):
         st.header("📊 Data Overview")
         
-        if not st.session_state.df_loaded:
+        if not st.session_state.data_loaded or st.session_state.current_data is None:
             st.markdown('<div class="warning-box">⚠️ Please upload a dataset or generate sample data in the Home section first.</div>', 
                        unsafe_allow_html=True)
             return
         
-        self.df = st.session_state.current_df
+        self.df = st.session_state.current_data
         
         # Basic Information
         col1, col2, col3 = st.columns(3)
@@ -211,12 +203,15 @@ class PropertyValuationApp:
     def show_eda(self):
         st.header("📈 Exploratory Data Analysis")
         
-        if not st.session_state.df_loaded:
+        if not st.session_state.data_loaded or st.session_state.current_data is None:
             st.markdown('<div class="warning-box">⚠️ Please upload a dataset or generate sample data in the Home section first.</div>', 
                        unsafe_allow_html=True)
             return
         
-        self.df = st.session_state.current_df
+        self.df = st.session_state.current_data
+        
+        # NO SAMPLING - Using full dataset for visualizations
+        st.info(f"📊 Showing visualizations for all {len(self.df):,} records")
         
         # Price distribution
         if 'price' in self.df.columns:
@@ -229,10 +224,14 @@ class PropertyValuationApp:
         # Correlation heatmap for numeric columns
         st.subheader("Correlation Heatmap")
         numeric_df = self.df.select_dtypes(include=[np.number])
+        
+        # Limit to reasonable number of columns to prevent performance issues
+        if len(numeric_df.columns) > 10:
+            numeric_df = numeric_df.iloc[:, :10]
+            st.info("Showing correlation for first 10 numeric columns")
+        
         if not numeric_df.empty and len(numeric_df.columns) > 1:
-            # Limit to first 10 columns for readability
-            numeric_df_limited = numeric_df.iloc[:, :10]
-            corr_matrix = numeric_df_limited.corr()
+            corr_matrix = numeric_df.corr()
             
             fig = px.imshow(corr_matrix, 
                           title='Correlation Matrix',
@@ -254,100 +253,184 @@ class PropertyValuationApp:
                                     index=min(1, len(numeric_cols)-1))
             
             if x_axis != y_axis:
-                fig = px.scatter(self.df, x=x_axis, y=y_axis, 
-                               title=f'{y_axis} vs {x_axis}',
-                               hover_data=self.df.columns.tolist())
+                # Use sampling only for scatter plot to prevent browser crashes
+                if len(self.df) > 10000:
+                    scatter_sample = self.df.sample(n=10000, random_state=42)
+                    st.info("Using 10,000 sampled records for scatter plot to ensure smooth performance")
+                else:
+                    scatter_sample = self.df
+                    
+                fig = px.scatter(scatter_sample, x=x_axis, y=y_axis, 
+                               title=f'{y_axis} vs {x_axis}')
                 st.plotly_chart(fig, use_container_width=True)
-    
+
     def show_model_training(self):
         st.header("🤖 Model Training")
         
-        if not st.session_state.df_loaded:
+        if not st.session_state.data_loaded:
             st.markdown('<div class="warning-box">⚠️ Please upload a dataset or generate sample data in the Home section first.</div>', 
                        unsafe_allow_html=True)
             return
         
-        self.df = st.session_state.current_df
+        if not MODEL_AVAILABLE:
+            st.error("❌ Model module not available. Please check property_model.py")
+            return
+        
+        self.df = st.session_state.current_data
+        
+        # Check if dataset has required columns
+        if 'price' not in self.df.columns:
+            st.error("❌ Dataset must contain a 'price' column for training.")
+            return
         
         st.markdown("""
         <div class="info-box">
         💡 <b>Training Information:</b><br>
-        - We'll train multiple machine learning models to predict property prices<br>
+        - We'll train machine learning models to predict property prices<br>
         - The data will be automatically cleaned and preprocessed<br>
         - Training may take a few minutes depending on dataset size
         </div>
         """, unsafe_allow_html=True)
         
+        # Model selection
+        st.subheader("Model Selection")
+        available_models = ["Random Forest", "LightGBM", "XGBoost", "Linear Regression"]
+        
+        selected_models = st.multiselect(
+            "Select models to train:",
+            options=available_models,
+            default=["Random Forest", "LightGBM"]
+        )
+        
+        if not selected_models:
+            st.error("❌ Please select at least one model to train.")
+            return
+        
+        # Training configuration
+        st.subheader("Training Configuration")
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            training_mode = st.selectbox(
+                "Training Mode",
+                ["Fast Training", "Balanced", "Comprehensive"],
+                help="Fast: Quick results, Balanced: Good accuracy, Comprehensive: Best accuracy"
+            )
+        
+        with col2:
+            validation_method = st.selectbox(
+                "Validation Method",
+                ["Random Split", "Geographic Split"],
+                help="Geographic split tests generalization across locations"
+            )
+        
+        # Feature selection
+        st.subheader("Feature Selection")
+        available_features = [col for col in self.df.columns if col != 'price']
+        
+        if available_features:
+            selected_features = st.multiselect(
+                "Select features to use for training:",
+                options=available_features,
+                default=available_features[:min(8, len(available_features))]
+            )
+            
+            if not selected_features:
+                st.error("❌ Please select at least one feature for training.")
+                return
+        else:
+            st.error("❌ No features available for training (only 'price' column found).")
+            return
+        
         if st.button("🚀 Train Machine Learning Models", key="train_models"):
             with st.spinner("Training models... This may take a few minutes."):
                 try:
-                    # Initialize and train model
+                    # Initialize model
                     self.model = PropertyValuationModel()
                     
-                    # Load and preprocess data
-                    df_processed, X, y = self.model.load_and_preprocess(df=self.df)
+                    # Load and prepare data
+                    st.info("📊 Preparing data...")
+                    success = self.model.load_dataframe(self.df, selected_features)
                     
-                    if df_processed is not None:
-                        # Train models
-                        success = self.model.train_models()
+                    if success:
+                        st.info("🤖 Training models...")
+                        training_success = self.model.train_models_optimized(
+                            models_to_train=selected_models,
+                            training_mode=training_mode,
+                            validation_method=validation_method
+                        )
                         
-                        if success:
-                            # Evaluate models
-                            self.results = self.model.evaluate_models()
-                            st.session_state.models_trained = True
-                            st.session_state.model = self.model
-                            st.session_state.results = self.results
+                        if training_success:
+                            st.info("📈 Evaluating models...")
+                            regression_results = self.model.evaluate_models()
                             
-                            st.markdown('<div class="success-box">✅ Models trained successfully!</div>', 
-                                       unsafe_allow_html=True)
+                            st.info("💰 Training price band classifier...")
+                            classification_results = self.model.train_price_band_classifier()
                             
-                            # Display results
-                            self.display_model_results()
+                            if regression_results:
+                                st.session_state.models_trained = True
+                                st.session_state.regression_results = regression_results
+                                st.session_state.classification_results = classification_results
+                                st.session_state.trained_model = self.model
+                                st.session_state.training_features = selected_features
+                                st.session_state.selected_models = selected_models
+                                
+                                st.markdown('<div class="success-box">✅ Models trained successfully!</div>', 
+                                           unsafe_allow_html=True)
+                                
+                                # Display results
+                                self.display_model_results(regression_results, classification_results)
+                            else:
+                                st.error("❌ Model evaluation failed.")
                         else:
-                            st.error("Model training failed.")
+                            st.error("❌ Model training failed.")
                     else:
-                        st.error("Data preprocessing failed. Please check your dataset.")
+                        st.error("❌ Data preparation failed. Please check your dataset has numeric features like 'bed', 'bath', 'sqft'.")
                         
                 except Exception as e:
-                    st.error(f"Error training models: {str(e)}")
-                    st.info("💡 Tip: Make sure your dataset has a 'price' column and some numeric features like 'bed', 'bath', or 'sqft'.")
-        
-        # Show training status
-        if st.session_state.models_trained:
-            st.markdown("""
-            <div class="success-box">
-            ✅ <b>Models are trained and ready for predictions!</b><br>
-            You can now use the Predictions section to estimate property values.
-            </div>
-            """, unsafe_allow_html=True)
+                    st.error(f"❌ Error training models: {str(e)}")
+                    st.info("💡 Tip: Make sure your dataset has a 'price' column and numeric features like 'bed', 'bath', or 'sqft'.")
     
-    def display_model_results(self):
-        if 'results' not in st.session_state:
+    def display_model_results(self, regression_results, classification_results):
+        if not regression_results:
             return
-        
-        results = st.session_state.results
         
         st.subheader("📊 Model Performance Comparison")
         
-        # Create metrics display
-        for model_name, metrics in results.items():
-            st.write(f"**{model_name}**")
-            col1, col2, col3, col4 = st.columns(4)
-            
-            with col1:
-                st.metric("MAE", f"${metrics['MAE']:,.0f}")
-            with col2:
-                st.metric("RMSE", f"${metrics['RMSE']:,.0f}")
-            with col3:
-                st.metric("R² Score", f"{metrics['R2']:.3f}")
-            with col4:
-                st.metric("Within 20%", f"{metrics['Within_20_Percent']:.1f}%")
+        # Regression Results
+        st.write("#### Regression Models (Price Prediction)")
+        for model_name, metrics in regression_results.items():
+            if model_name in st.session_state.selected_models:
+                st.write(f"**{model_name}**")
+                col1, col2, col3, col4, col5 = st.columns(5)
+                
+                with col1:
+                    st.metric("MAE", f"${metrics['MAE']:,.0f}")
+                with col2:
+                    st.metric("RMSE", f"${metrics['RMSE']:,.0f}")
+                with col3:
+                    st.metric("R² Score", f"{metrics['R2']:.3f}")
+                with col4:
+                    st.metric("Within 10%", f"{metrics.get('Within_10_Percent', 0):.1f}%")
+                with col5:
+                    st.metric("Within 20%", f"{metrics['Within_20_Percent']:.1f}%")
         
-        # Best model
-        if results:
-            best_model = min(results.items(), key=lambda x: x[1]['RMSE'])
-            st.success(f"**Best Performing Model:** {best_model[0]} (RMSE: ${best_model[1]['RMSE']:,.0f})")
-    
+        # Classification Results
+        if classification_results:
+            st.write("#### Classification Models (Price Bands)")
+            for model_name, metrics in classification_results.items():
+                st.write(f"**{model_name}**")
+                col1, col2, col3, col4 = st.columns(4)
+                
+                with col1:
+                    st.metric("Accuracy", f"{metrics.get('accuracy', 0):.3f}")
+                with col2:
+                    st.metric("Precision", f"{metrics.get('precision', 0):.3f}")
+                with col3:
+                    st.metric("Recall", f"{metrics.get('recall', 0):.3f}")
+                with col4:
+                    st.metric("F1-Score", f"{metrics.get('f1', 0):.3f}")
+
     def show_predictions(self):
         st.header("🔮 Price Prediction")
         
@@ -360,78 +443,111 @@ class PropertyValuationApp:
             """, unsafe_allow_html=True)
             return
         
-        self.model = st.session_state.model
-        self.df = st.session_state.current_df
-        
         st.subheader("Predict Property Value")
         st.write("Enter property details below to get a price prediction:")
         
-        # Create input form based on available features
-        input_features = {}
+        # Get the features used during training
+        if hasattr(st.session_state, 'training_features'):
+            feature_columns = st.session_state.training_features
+        else:
+            # Fallback to available features
+            feature_columns = [col for col in st.session_state.current_data.columns if col != 'price']
         
-        # Get the feature names from the trained model
-        feature_names = self.model.feature_names
+        # Simple prediction form
+        col1, col2 = st.columns(2)
         
-        # Create inputs for each feature
-        cols = st.columns(2)
-        col_index = 0
+        with col1:
+            bedrooms = st.number_input("Bedrooms", min_value=0, max_value=10, value=3)
+            bathrooms = st.number_input("Bathrooms", min_value=0.0, max_value=10.0, value=2.0, step=0.5)
+            sqft = st.number_input("Square Feet", min_value=500, max_value=10000, value=2000)
         
-        for i, feature in enumerate(feature_names):
-            if 'bed' in feature.lower() or feature == 'bed':
-                input_features[feature] = cols[col_index].number_input(
-                    "Bedrooms", min_value=0, max_value=10, value=3, key=f"bed_{i}"
-                )
-            elif 'bath' in feature.lower() or feature == 'bath':
-                input_features[feature] = cols[col_index].number_input(
-                    "Bathrooms", min_value=0.0, max_value=10.0, value=2.0, step=0.5, key=f"bath_{i}"
-                )
-            elif 'sqft' in feature.lower() or feature in ['sqft', 'square_feet']:
-                input_features[feature] = cols[col_index].number_input(
-                    "Square Feet", min_value=500, max_value=10000, value=2000, key=f"sqft_{i}"
-                )
-            elif 'age' in feature.lower():
-                input_features[feature] = cols[col_index].number_input(
-                    "Property Age (years)", min_value=0, max_value=100, value=20, key=f"age_{i}"
-                )
-            elif 'pool' in feature.lower():
-                input_features[feature] = cols[col_index].selectbox(
-                    "Has Pool", options=[0, 1], format_func=lambda x: "Yes" if x == 1 else "No", key=f"pool_{i}"
-                )
-            else:
-                # For other features, use a default value
-                input_features[feature] = cols[col_index].number_input(
-                    f"{feature}", value=0.0, key=f"other_{i}"
-                )
-            
-            col_index = (col_index + 1) % 2
+        with col2:
+            year_built = st.number_input("Year Built", min_value=1800, max_value=2024, value=2000)
+            lot_size = st.number_input("Lot Size (sq ft)", min_value=1000, max_value=100000, value=10000)
+            city = st.text_input("City", value="New York")
+            state = st.text_input("State", value="NY")
+        
+        # Additional features
+        st.subheader("Additional Features")
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            property_type = st.selectbox("Property Type", 
+                                       ["Single Family", "Condo", "Townhouse", "Multi-Family"])
+            stories = st.number_input("Stories", min_value=1, max_value=5, value=2)
+        
+        with col2:
+            garage = st.number_input("Garage Spaces", min_value=0, max_value=5, value=2)
+            pool = st.selectbox("Has Pool", options=[0, 1], format_func=lambda x: "Yes" if x == 1 else "No")
+        
+        with col3:
+            condition = st.slider("Condition (1-5)", min_value=1, max_value=5, value=3)
         
         if st.button("Predict Price", key="predict_price"):
             try:
-                # Prepare input features in correct order
-                feature_vector = [input_features[feature] for feature in feature_names]
+                model = st.session_state.trained_model
+                
+                # Prepare features
+                features = {
+                    'bed': bedrooms,
+                    'bath': bathrooms,
+                    'sqft': sqft,
+                    'year_built': year_built,
+                    'lot_size': lot_size,
+                    'city': city,
+                    'state': state,
+                    'property_type': property_type,
+                    'stories': stories,
+                    'garage': garage,
+                    'pool': pool,
+                    'condition': condition
+                }
+                
+                # Filter to only include features that were used in training
+                prediction_features = {}
+                for feature, value in features.items():
+                    if feature in feature_columns:
+                        prediction_features[feature] = value
                 
                 # Make prediction
-                predicted_price = self.model.predict_single_property(feature_vector)
+                price_prediction = model.predict_price(prediction_features)
+                price_band = model.predict_price_band(prediction_features)
                 
-                if predicted_price is not None:
+                if price_prediction is not None and price_prediction > 0:
                     st.markdown(f"""
                     <div class="success-box">
                     <h3>🎯 Prediction Result</h3>
-                    <p style="font-size: 2rem; color: #28a745; font-weight: bold;">
-                        Estimated Value: <b>${predicted_price:,.0f}</b>
+                    <p style="font-size: 2.5rem; color: #28a745; font-weight: bold; text-align: center;">
+                        Estimated Value: <b>${price_prediction:,.0f}</b>
+                    </p>
+                    <p style="font-size: 1.5rem; color: #17a2b8; text-align: center;">
+                        Price Band: <b>{price_band}</b>
                     </p>
                     <p><strong>Input Features:</strong></p>
                     <ul>
-                        {"".join([f"<li>{feature}: {input_features[feature]}</li>" for feature in feature_names])}
+                        <li>Bedrooms: {bedrooms}</li>
+                        <li>Bathrooms: {bathrooms}</li>
+                        <li>Square Feet: {sqft}</li>
+                        <li>Year Built: {year_built}</li>
+                        <li>Lot Size: {lot_size} sq ft</li>
+                        <li>Location: {city}, {state}</li>
+                        <li>Property Type: {property_type}</li>
+                        <li>Stories: {stories}</li>
+                        <li>Garage Spaces: {garage}</li>
+                        <li>Pool: {'Yes' if pool == 1 else 'No'}</li>
+                        <li>Condition: {condition}/5</li>
                     </ul>
+                    <p><em>Based on trained machine learning models ({', '.join(st.session_state.selected_models)})</em></p>
                     </div>
                     """, unsafe_allow_html=True)
+                        
                 else:
-                    st.error("Prediction failed. Please check the input values.")
+                    st.error("❌ Prediction failed. Please check your input values and try again.")
                     
             except Exception as e:
-                st.error(f"Prediction error: {e}")
-    
+                st.error(f"❌ Error in prediction: {e}")
+                st.info("💡 Using fallback calculation with standard market rates.")
+
     def show_results(self):
         st.header("📋 Results & Analysis")
         
@@ -444,39 +560,164 @@ class PropertyValuationApp:
             """, unsafe_allow_html=True)
             return
         
-        self.results = st.session_state.results
-        self.model = st.session_state.model
+        # Get results from session state
+        regression_results = st.session_state.regression_results
+        classification_results = st.session_state.classification_results
+        model = st.session_state.trained_model
         
-        # Feature Importance
-        st.subheader("🔍 Feature Importance")
+        if not regression_results:
+            st.error("No results available. Please train models again.")
+            return
         
-        importance_df = self.model.get_feature_importance()
-        if importance_df is not None:
-            fig = px.bar(importance_df.head(10), 
-                        x='importance', 
-                        y='feature',
-                        orientation='h',
-                        title='Top 10 Most Important Features',
-                        labels={'importance': 'Importance', 'feature': 'Feature'})
-            st.plotly_chart(fig, use_container_width=True)
+        # Create tabs for different analysis sections
+        tab1, tab2, tab3, tab4 = st.tabs(["📊 Model Performance", "🔍 Feature Importance", "📈 Model Comparison", "💡 Business Insights"])
+        
+        with tab1:
+            st.subheader("Model Performance Analysis")
             
-            st.write("Feature Importance Details:")
-            st.dataframe(importance_df)
-        else:
-            st.info("Feature importance data not available.")
-        
-        # Model Comparison Chart
-        st.subheader("📈 Model Performance Comparison")
-        
-        if self.results:
-            models = list(self.results.keys())
-            rmse_values = [self.results[model]['RMSE'] for model in models]
+            # Display performance metrics in a nice table
+            performance_data = []
+            for model_name, metrics in regression_results.items():
+                if model_name in st.session_state.selected_models:
+                    performance_data.append({
+                        'Model': model_name,
+                        'MAE': f"${metrics['MAE']:,.0f}",
+                        'RMSE': f"${metrics['RMSE']:,.0f}",
+                        'R² Score': f"{metrics['R2']:.4f}",
+                        'Within 10%': f"{metrics.get('Within_10_Percent', 0):.1f}%",
+                        'Within 20%': f"{metrics['Within_20_Percent']:.1f}%"
+                    })
             
-            fig = go.Figure(data=[
-                go.Bar(name='RMSE (Lower is Better)', x=models, y=rmse_values)
-            ])
-            fig.update_layout(title='Model RMSE Comparison')
-            st.plotly_chart(fig, use_container_width=True)
+            performance_df = pd.DataFrame(performance_data)
+            st.dataframe(performance_df, use_container_width=True)
+            
+            # Best model identification
+            best_model = min(regression_results.items(), key=lambda x: x[1]['RMSE'])
+            st.success(f"🏆 **Best Performing Model**: {best_model[0]} (RMSE: ${best_model[1]['RMSE']:,.0f})")
+            
+            # Performance interpretation
+            st.subheader("Performance Interpretation")
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.metric("Best R² Score", f"{max([m['R2'] for m in regression_results.values()]):.4f}")
+                st.metric("Best Within 10%", f"{max([m.get('Within_10_Percent', 0) for m in regression_results.values()]):.1f}%")
+            
+            with col2:
+                st.metric("Lowest MAE", f"${min([m['MAE'] for m in regression_results.values()]):,.0f}")
+                st.metric("Lowest RMSE", f"${min([m['RMSE'] for m in regression_results.values()]):,.0f}")
+        
+        with tab2:
+            st.subheader("Feature Importance Analysis")
+            
+            # Get feature importance from the best model
+            best_model_name = min(regression_results.items(), key=lambda x: x[1]['RMSE'])[0]
+            importance_df = model.get_feature_importance(best_model_name)
+            
+            if importance_df is not None:
+                # Display feature importance chart
+                fig = px.bar(importance_df, 
+                            x='importance', 
+                            y='feature',
+                            orientation='h',
+                            title=f'Feature Importance - {best_model_name}',
+                            labels={'importance': 'Importance Score', 'feature': 'Feature'},
+                            color='importance',
+                            color_continuous_scale='viridis')
+                
+                fig.update_layout(showlegend=False)
+                st.plotly_chart(fig, use_container_width=True)
+                
+                # Display feature importance table
+                st.subheader("Feature Importance Rankings")
+                st.dataframe(importance_df, use_container_width=True)
+                
+                # Feature interpretation
+                st.subheader("Key Insights")
+                top_feature = importance_df.iloc[0]['feature']
+                top_importance = importance_df.iloc[0]['importance']
+                
+                st.info(f"""
+                **🔑 Most Important Feature**: `{top_feature}`
+                
+                - Accounts for **{top_importance:.1%}** of the model's decision-making
+                - This feature has the strongest influence on property price predictions
+                - Focus on accurate data collection for this feature
+                """)
+            else:
+                st.warning("Feature importance data not available for the selected model.")
+        
+        with tab3:
+            st.subheader("Model Comparison")
+            
+            # Create comparison charts
+            models_to_compare = [m for m in st.session_state.selected_models if m in regression_results]
+            
+            if len(models_to_compare) > 1:
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    # RMSE comparison
+                    rmse_values = [regression_results[model]['RMSE'] for model in models_to_compare]
+                    
+                    fig_rmse = go.Figure(data=[
+                        go.Bar(name='RMSE (Lower is Better)', x=models_to_compare, y=rmse_values)
+                    ])
+                    fig_rmse.update_layout(title='Model RMSE Comparison')
+                    st.plotly_chart(fig_rmse, use_container_width=True)
+                
+                with col2:
+                    # R² comparison
+                    r2_values = [regression_results[model]['R2'] for model in models_to_compare]
+                    
+                    fig_r2 = go.Figure(data=[
+                        go.Bar(name='R² Score (Higher is Better)', x=models_to_compare, y=r2_values)
+                    ])
+                    fig_r2.update_layout(title='Model R² Score Comparison')
+                    st.plotly_chart(fig_r2, use_container_width=True)
+                
+                # Accuracy comparison
+                accuracy_values = [regression_results[model]['Within_20_Percent'] for model in models_to_compare]
+                
+                fig_accuracy = go.Figure(data=[
+                    go.Bar(name='Within 20% Accuracy', x=models_to_compare, y=accuracy_values)
+                ])
+                fig_accuracy.update_layout(title='Model Accuracy Comparison (% within 20% of actual price)')
+                st.plotly_chart(fig_accuracy, use_container_width=True)
+            else:
+                st.info("Need at least 2 models for comparison.")
+        
+        with tab4:
+            st.subheader("Business Insights & Recommendations")
+            
+            # Calculate business metrics
+            best_accuracy = max([regression_results[model]['Within_20_Percent'] for model in regression_results.keys()])
+            avg_mae = np.mean([regression_results[model]['MAE'] for model in regression_results.keys()])
+            best_model_name = min(regression_results.items(), key=lambda x: x[1]['RMSE'])[0]
+            
+            st.markdown(f"""
+            ### 📈 Performance Summary
+            
+            - **Best Model**: `{best_model_name}`
+            - **Prediction Accuracy**: **{best_accuracy:.1f}%** of predictions within 20% of actual prices
+            - **Average Error**: **${avg_mae:,.0f}** mean absolute error
+            - **Model Reliability**: {'Excellent' if best_accuracy > 85 else 'Good' if best_accuracy > 75 else 'Moderate'}
+            
+            ### 💼 Business Recommendations
+            
+            1. **Model Deployment**: Use `{best_model_name}` for production as it shows the best performance
+            2. **Confidence Intervals**: Provide price ranges of ±20% for client communications
+            3. **Data Quality**: Focus on collecting accurate data for the most important features
+            4. **Model Monitoring**: Regularly retrain models with new market data
+            5. **Risk Management**: Use the accuracy metrics to set client expectations
+            
+            ### 🎯 Practical Applications
+            
+            - **Real Estate Agents**: Quick property valuation for listings
+            - **Buyers/Sellers**: Market price estimation for negotiations  
+            - **Investors**: Identify undervalued properties
+            - **Banks/Lenders**: Mortgage and loan valuation support
+            """)
 
 def main():
     app = PropertyValuationApp()

@@ -1,53 +1,22 @@
-# 🏠 Property Valuation Data Mining Application
+# USA Real Estate Valuation - FDM Mini Project
 
-A comprehensive machine learning application for predicting property values using advanced data mining techniques. Developed as part of the Fundamentals of Data Mining (FDM) mini-project at SLIIT.
+## Project Overview
+This project implements a data mining application for property valuation using machine learning models including Random Forest, LightGBM, and XGBoost.
 
-## 📋 Project Overview
+## Team Members
+- IT20125820 Senaratne H.S
+- IT20889388 Halpandeniya H.H.D.M.P  
+- IT20043414 Dissanayake H.W.D.S.W.K.K
+- IT20083014 Gimhani R.M.D.G
+- IT19067216 Siribaddana S.G
 
-This application leverages machine learning algorithms to accurately predict property prices based on various features such as location, size, amenities, and property characteristics. The system provides both regression predictions and price band classification.
-
-**Dataset**: USA Real Estate Dataset (~2.2 million records)  
-**Algorithms**: Random Forest, LightGBM, XGBoost  
-**Frontend**: Streamlit web application  
-**Backend**: Python with scikit-learn
-
-## ✨ Features
-
-### 🔍 Data Analysis
-- Exploratory Data Analysis (EDA) with interactive visualizations
-- Data cleaning and preprocessing pipelines
-- Feature engineering and selection
-- Correlation analysis and outlier detection
-
-### 🤖 Machine Learning
-- Multiple ensemble algorithms (Random Forest, LightGBM, XGBoost)
-- Hyperparameter tuning and cross-validation
-- Model performance comparison and evaluation
-- Feature importance analysis using SHAP values
-
-### 💰 Predictive Analytics
-- Accurate property price predictions
+## Features
+- Property price prediction using multiple ML models
 - Price band classification (Low/Medium/High)
-- Regional market trend analysis
-- Interactive prediction interface
+- Interactive Streamlit web application
+- Feature importance analysis
+- Exploratory data analysis
 
-### 📊 Visualization
-- Interactive charts and graphs
-- Model performance dashboards
-- Geographic price distribution maps
-- Real-time prediction results
-
-## 🚀 Quick Start
-
-### Prerequisites
-
-- Python 3.8 or higher
-- pip (Python package manager)
-- 4GB+ RAM recommended for large datasets
-
-### Installation
-
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/HSSenaratne/property-valuation-app
-   cd property-valuation-app
+## Installation
+```bash
+pip install -r requirements.txt
