@@ -19,7 +19,7 @@ except ImportError as e:
 # Page configuration
 st.set_page_config(
     page_title="Property Valuation App",
-    page_icon="🏠",
+    
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -28,8 +28,8 @@ st.set_page_config(
 st.markdown("""
 <style>
     .main-header {
-        font-size: 2.5rem;
-        color: #1f77b4;
+        font-size: 3.5rem;
+        color: navy;
         text-align: center;
         margin-bottom: 2rem;
     }
@@ -67,7 +67,7 @@ class PropertyValuationApp:
         
     def run(self):
         # Header
-        st.markdown('<h1 class="main-header">🏠 Property Valuation Data Mining App</h1>', 
+        st.markdown('<h1 class="main-header"> Property Valuation Data Mining App</h1>', 
                    unsafe_allow_html=True)
         
         # Initialize session state
@@ -103,13 +103,13 @@ class PropertyValuationApp:
         
         This application uses machine learning to predict property values based on various features.
         
-        ### 🚀 Quick Start:
+        ###  Quick Start:
         1. **Upload your dataset** below (CSV format) or use our sample data
         2. **Explore the data** in the Data Overview section
         3. **Train machine learning models** 
         4. **Make predictions** and analyze results
         
-        ### 📊 Supported Data Format:
+        ###  Supported Data Format:
         Your CSV should include columns like: `price`, `bed`, `bath`, `sqft`, `city`, `state`, etc.
         """)
         
@@ -125,7 +125,7 @@ class PropertyValuationApp:
                     st.session_state.current_data = self.df
                     st.session_state.data_loaded = True
                     
-                    st.markdown(f'<div class="success-box">✅ Dataset loaded successfully!<br>Shape: {self.df.shape}</div>', 
+                    st.markdown(f'<div class="success-box"> Dataset loaded successfully!<br>Shape: {self.df.shape}</div>', 
                                unsafe_allow_html=True)
                     
                     st.subheader("Dataset Preview")
@@ -145,7 +145,7 @@ class PropertyValuationApp:
                         st.session_state.current_data = self.df
                         st.session_state.data_loaded = True
                         
-                        st.markdown(f'<div class="success-box">✅ Sample dataset created!<br>Shape: {self.df.shape}</div>', 
+                        st.markdown(f'<div class="success-box"> Sample dataset created!<br>Shape: {self.df.shape}</div>', 
                                    unsafe_allow_html=True)
                         
                         st.subheader("Sample Data Preview")
@@ -156,10 +156,10 @@ class PropertyValuationApp:
                     st.error(f"Error creating sample data: {e}")
     
     def show_data_overview(self):
-        st.header("📊 Data Overview")
+        st.header(" Data Overview")
         
         if not st.session_state.data_loaded or st.session_state.current_data is None:
-            st.markdown('<div class="warning-box">⚠️ Please upload a dataset or generate sample data in the Home section first.</div>', 
+            st.markdown('<div class="warning-box"> Please upload a dataset or generate sample data in the Home section first.</div>', 
                        unsafe_allow_html=True)
             return
         
@@ -201,17 +201,17 @@ class PropertyValuationApp:
             st.dataframe(self.df.describe())
     
     def show_eda(self):
-        st.header("📈 Exploratory Data Analysis")
+        st.header(" Exploratory Data Analysis")
         
         if not st.session_state.data_loaded or st.session_state.current_data is None:
-            st.markdown('<div class="warning-box">⚠️ Please upload a dataset or generate sample data in the Home section first.</div>', 
+            st.markdown('<div class="warning-box"> Please upload a dataset or generate sample data in the Home section first.</div>', 
                        unsafe_allow_html=True)
             return
         
         self.df = st.session_state.current_data
         
         # NO SAMPLING - Using full dataset for visualizations
-        st.info(f"📊 Showing visualizations for all {len(self.df):,} records")
+        st.info(f" Showing visualizations for all {len(self.df):,} records")
         
         # Price distribution
         if 'price' in self.df.columns:
@@ -265,27 +265,27 @@ class PropertyValuationApp:
                 st.plotly_chart(fig, use_container_width=True)
 
     def show_model_training(self):
-        st.header("🤖 Model Training")
+        st.header(" Model Training")
         
         if not st.session_state.data_loaded:
-            st.markdown('<div class="warning-box">⚠️ Please upload a dataset or generate sample data in the Home section first.</div>', 
+            st.markdown('<div class="warning-box"> Please upload a dataset or generate sample data in the Home section first.</div>', 
                        unsafe_allow_html=True)
             return
         
         if not MODEL_AVAILABLE:
-            st.error("❌ Model module not available. Please check property_model.py")
+            st.error(" Model module not available. Please check property_model.py")
             return
         
         self.df = st.session_state.current_data
         
         # Check if dataset has required columns
         if 'price' not in self.df.columns:
-            st.error("❌ Dataset must contain a 'price' column for training.")
+            st.error(" Dataset must contain a 'price' column for training.")
             return
         
         st.markdown("""
         <div class="info-box">
-        💡 <b>Training Information:</b><br>
+         <b>Training Information:</b><br>
         - We'll train machine learning models to predict property prices<br>
         - The data will be automatically cleaned and preprocessed<br>
         - Training may take a few minutes depending on dataset size
@@ -303,7 +303,7 @@ class PropertyValuationApp:
         )
         
         if not selected_models:
-            st.error("❌ Please select at least one model to train.")
+            st.error(" Please select at least one model to train.")
             return
         
         # Training configuration
@@ -336,24 +336,24 @@ class PropertyValuationApp:
             )
             
             if not selected_features:
-                st.error("❌ Please select at least one feature for training.")
+                st.error(" Please select at least one feature for training.")
                 return
         else:
-            st.error("❌ No features available for training (only 'price' column found).")
+            st.error(" No features available for training (only 'price' column found).")
             return
         
-        if st.button("🚀 Train Machine Learning Models", key="train_models"):
+        if st.button(" Train Machine Learning Models", key="train_models"):
             with st.spinner("Training models... This may take a few minutes."):
                 try:
                     # Initialize model
                     self.model = PropertyValuationModel()
                     
                     # Load and prepare data
-                    st.info("📊 Preparing data...")
+                    st.info(" Preparing data...")
                     success = self.model.load_dataframe(self.df, selected_features)
                     
                     if success:
-                        st.info("🤖 Training models...")
+                        st.info(" Training models...")
                         training_success = self.model.train_models_optimized(
                             models_to_train=selected_models,
                             training_mode=training_mode,
@@ -361,10 +361,10 @@ class PropertyValuationApp:
                         )
                         
                         if training_success:
-                            st.info("📈 Evaluating models...")
+                            st.info(" Evaluating models...")
                             regression_results = self.model.evaluate_models()
                             
-                            st.info("💰 Training price band classifier...")
+                            st.info(" Training price band classifier...")
                             classification_results = self.model.train_price_band_classifier()
                             
                             if regression_results:
@@ -375,27 +375,27 @@ class PropertyValuationApp:
                                 st.session_state.training_features = selected_features
                                 st.session_state.selected_models = selected_models
                                 
-                                st.markdown('<div class="success-box">✅ Models trained successfully!</div>', 
+                                st.markdown('<div class="success-box"> Models trained successfully!</div>', 
                                            unsafe_allow_html=True)
                                 
                                 # Display results
                                 self.display_model_results(regression_results, classification_results)
                             else:
-                                st.error("❌ Model evaluation failed.")
+                                st.error(" Model evaluation failed.")
                         else:
-                            st.error("❌ Model training failed.")
+                            st.error(" Model training failed.")
                     else:
-                        st.error("❌ Data preparation failed. Please check your dataset has numeric features like 'bed', 'bath', 'sqft'.")
+                        st.error(" Data preparation failed. Please check your dataset has numeric features like 'bed', 'bath', 'sqft'.")
                         
                 except Exception as e:
-                    st.error(f"❌ Error training models: {str(e)}")
-                    st.info("💡 Tip: Make sure your dataset has a 'price' column and numeric features like 'bed', 'bath', or 'sqft'.")
+                    st.error(f" Error training models: {str(e)}")
+                    st.info(" Tip: Make sure your dataset has a 'price' column and numeric features like 'bed', 'bath', or 'sqft'.")
     
     def display_model_results(self, regression_results, classification_results):
         if not regression_results:
             return
         
-        st.subheader("📊 Model Performance Comparison")
+        st.subheader(" Model Performance Comparison")
         
         # Regression Results
         st.write("#### Regression Models (Price Prediction)")
@@ -432,12 +432,12 @@ class PropertyValuationApp:
                     st.metric("F1-Score", f"{metrics.get('f1', 0):.3f}")
 
     def show_predictions(self):
-        st.header("🔮 Price Prediction")
+        st.header(" Price Prediction")
         
         if not st.session_state.models_trained:
             st.markdown("""
             <div class="warning-box">
-            ⚠️ <b>Models not trained yet!</b><br>
+             <b>Models not trained yet!</b><br>
             Please go to the <b>Model Training</b> section and train the models first.
             </div>
             """, unsafe_allow_html=True)
@@ -516,7 +516,7 @@ class PropertyValuationApp:
                 if price_prediction is not None and price_prediction > 0:
                     st.markdown(f"""
                     <div class="success-box">
-                    <h3>🎯 Prediction Result</h3>
+                    <h3> Prediction Result</h3>
                     <p style="font-size: 2.5rem; color: #28a745; font-weight: bold; text-align: center;">
                         Estimated Value: <b>${price_prediction:,.0f}</b>
                     </p>
@@ -542,19 +542,19 @@ class PropertyValuationApp:
                     """, unsafe_allow_html=True)
                         
                 else:
-                    st.error("❌ Prediction failed. Please check your input values and try again.")
+                    st.error(" Prediction failed. Please check your input values and try again.")
                     
             except Exception as e:
-                st.error(f"❌ Error in prediction: {e}")
-                st.info("💡 Using fallback calculation with standard market rates.")
+                st.error(f" Error in prediction: {e}")
+                st.info(" Using fallback calculation with standard market rates.")
 
     def show_results(self):
-        st.header("📋 Results & Analysis")
+        st.header(" Results & Analysis")
         
         if not st.session_state.models_trained:
             st.markdown("""
             <div class="warning-box">
-            ⚠️ <b>No results available yet!</b><br>
+             <b>No results available yet!</b><br>
             Please train models in the <b>Model Training</b> section first.
             </div>
             """, unsafe_allow_html=True)
@@ -570,7 +570,7 @@ class PropertyValuationApp:
             return
         
         # Create tabs for different analysis sections
-        tab1, tab2, tab3, tab4 = st.tabs(["📊 Model Performance", "🔍 Feature Importance", "📈 Model Comparison", "💡 Business Insights"])
+        tab1, tab2, tab3, tab4 = st.tabs([" Model Performance", " Feature Importance", " Model Comparison", " Business Insights"])
         
         with tab1:
             st.subheader("Model Performance Analysis")
@@ -593,7 +593,7 @@ class PropertyValuationApp:
             
             # Best model identification
             best_model = min(regression_results.items(), key=lambda x: x[1]['RMSE'])
-            st.success(f"🏆 **Best Performing Model**: {best_model[0]} (RMSE: ${best_model[1]['RMSE']:,.0f})")
+            st.success(f" **Best Performing Model**: {best_model[0]} (RMSE: ${best_model[1]['RMSE']:,.0f})")
             
             # Performance interpretation
             st.subheader("Performance Interpretation")
@@ -638,7 +638,7 @@ class PropertyValuationApp:
                 top_importance = importance_df.iloc[0]['importance']
                 
                 st.info(f"""
-                **🔑 Most Important Feature**: `{top_feature}`
+                ** Most Important Feature**: `{top_feature}`
                 
                 - Accounts for **{top_importance:.1%}** of the model's decision-making
                 - This feature has the strongest influence on property price predictions
@@ -696,14 +696,14 @@ class PropertyValuationApp:
             best_model_name = min(regression_results.items(), key=lambda x: x[1]['RMSE'])[0]
             
             st.markdown(f"""
-            ### 📈 Performance Summary
+            ###  Performance Summary
             
             - **Best Model**: `{best_model_name}`
             - **Prediction Accuracy**: **{best_accuracy:.1f}%** of predictions within 20% of actual prices
             - **Average Error**: **${avg_mae:,.0f}** mean absolute error
             - **Model Reliability**: {'Excellent' if best_accuracy > 85 else 'Good' if best_accuracy > 75 else 'Moderate'}
             
-            ### 💼 Business Recommendations
+            ###  Business Recommendations
             
             1. **Model Deployment**: Use `{best_model_name}` for production as it shows the best performance
             2. **Confidence Intervals**: Provide price ranges of ±20% for client communications
@@ -711,7 +711,7 @@ class PropertyValuationApp:
             4. **Model Monitoring**: Regularly retrain models with new market data
             5. **Risk Management**: Use the accuracy metrics to set client expectations
             
-            ### 🎯 Practical Applications
+            ###  Practical Applications
             
             - **Real Estate Agents**: Quick property valuation for listings
             - **Buyers/Sellers**: Market price estimation for negotiations  
